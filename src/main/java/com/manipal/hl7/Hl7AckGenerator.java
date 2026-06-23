@@ -15,27 +15,38 @@ public class Hl7AckGenerator {
      * Parses the incoming HL7 message and generates a standard ACK.
      * Swaps sending/receiving application and facility, and matches the message control ID and version.
      *
-     * @param rawHl7 The raw HL7 message string
-     * @return The standard HL7 ACK message string (using \r as segment separator)
+     * @param rawHl7 The raw HL7 message string (potentially containing MLLP framing characters)
+     * @return The standard HL7 ACK message string (wrapped in MLLP framing if detected on input)
      */
     public static String generateAck(String rawHl7) {
-        if (rawHl7 == null || rawHl7.trim().isEmpty()) {
-            return generateGenericAck("UNKNOWN_ID", "AE", "Empty HL7 message received");
+        if (rawHl7 == null) {
+            return generateGenericAck("UNKNOWN_ID", "AE", "Empty HL7 message received", false);
+        }
+
+        // 1. Detect if the incoming message has MLLP framing (VT=0x0B, FS=0x1C)
+        boolean hasMllpFraming = rawHl7.contains("\u000b") || rawHl7.contains("\u001c");
+
+        // 2. Clean the incoming message for parsing (remove MLLP framing characters)
+        String cleanHl7 = rawHl7.replace("\u000b", "").replace("\u001c", "").trim();
+
+        if (cleanHl7.isEmpty()) {
+            return generateGenericAck("UNKNOWN_ID", "AE", "Empty HL7 message after cleaning", hasMllpFraming);
         }
 
         try {
             // HL7 segments can be separated by \r, \n, or \r\n
-            String[] segments = rawHl7.split("[\\r\\n]+");
+            String[] segments = cleanHl7.split("[\\r\\n]+");
             String mshSegment = null;
             for (String segment : segments) {
-                if (segment.startsWith("MSH")) {
-                    mshSegment = segment;
+                String trimmedSegment = segment.trim();
+                if (trimmedSegment.startsWith("MSH")) {
+                    mshSegment = trimmedSegment;
                     break;
                 }
             }
 
             if (mshSegment == null) {
-                return generateGenericAck("UNKNOWN_ID", "AE", "MSH segment not found");
+                return generateGenericAck("UNKNOWN_ID", "AE", "MSH segment not found", hasMllpFraming);
             }
 
             // The field separator is the 4th character of MSH (index 3)
@@ -78,6 +89,12 @@ public class Hl7AckGenerator {
 
             // Construct MSH segment of ACK (swap sender and receiver)
             StringBuilder ack = new StringBuilder();
+            
+            // Prepend MLLP start block character (VT) if needed
+            if (hasMllpFraming) {
+                ack.append("\u000b");
+            }
+
             ack.append("MSH").append(fieldSepChar)
                .append("^~\\&").append(fieldSepChar)
                .append(receivingApp).append(fieldSepChar)        // ACK Sending App = Original Receiving App
@@ -98,18 +115,36 @@ public class Hl7AckGenerator {
                .append(messageControlId)
                .append("\r");
 
+            // Append MLLP end block characters (FS + CR) if needed
+            if (hasMllpFraming) {
+                ack.append("\u001c\r");
+            }
+
             return ack.toString();
         } catch (Exception e) {
-            return generateGenericAck("UNKNOWN_ID", "AE", "Error parsing message: " + e.getMessage());
+            return generateGenericAck("UNKNOWN_ID", "AE", "Error parsing message: " + e.getMessage(), hasMllpFraming);
         }
     }
 
     /**
      * Generates a generic error ACK message.
      */
-    private static String generateGenericAck(String controlId, String ackCode, String text) {
+    private static String generateGenericAck(String controlId, String ackCode, String text, boolean wrapInMllp) {
         String currentDateTime = LocalDateTime.now().format(DATE_FORMATTER);
-        return "MSH|^~\\&|HL7_RECEIVER||||" + currentDateTime + "||ACK|" + controlId + "|P|2.3.1\r" +
-               "MSA|" + ackCode + "|" + controlId + "|" + text + "\r";
+        StringBuilder genericAck = new StringBuilder();
+        
+        if (wrapInMllp) {
+            genericAck.append("\u000b");
+        }
+        
+        genericAck.append("MSH|^~\\&|HL7_RECEIVER||||").append(currentDateTime)
+                  .append("||ACK|").append(controlId).append("|P|2.3.1\r")
+                  .append("MSA|").append(ackCode).append("|").append(controlId).append("|").append(text).append("\r");
+                  
+        if (wrapInMllp) {
+            genericAck.append("\u001c\r");
+        }
+        
+        return genericAck.toString();
     }
 }
