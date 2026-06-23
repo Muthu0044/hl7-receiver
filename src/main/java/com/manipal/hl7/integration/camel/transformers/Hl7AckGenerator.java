@@ -1,4 +1,4 @@
-package com.manipal.hl7;
+package com.manipal.hl7.integration.camel.transformers;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -15,7 +15,7 @@ public class Hl7AckGenerator {
      * Parses the incoming HL7 message and generates a standard ACK.
      * Swaps sending/receiving application and facility, and matches the message control ID and version.
      *
-     * @param rawHl7 The raw HL7 message string (potentially containing MLLP framing characters)
+     * @param rawHl7 The raw incoming HL7 message string (potentially containing MLLP framing characters)
      * @return The standard HL7 ACK message string (wrapped in MLLP framing if detected on input)
      */
     public static String generateAck(String rawHl7) {

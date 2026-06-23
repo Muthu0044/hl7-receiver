@@ -1,4 +1,4 @@
-package com.manipal.hl7;
+package com.manipal.hl7.service.processor;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 

@@ -1,4 +1,4 @@
-package com.manipal.hl7;
+package com.manipal.hl7.config.netty;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
@@ -8,7 +8,7 @@ import org.apache.camel.component.hl7.HL7MLLPNettyEncoderFactory;
 
 /**
  * Configuration class that produces Netty encoder and decoder beans
- * for processing HL7 MLLP (Minimal Lower Layer Protocol) messages.
+ * for processing HL7 MLLP messages.
  */
 @ApplicationScoped
 public class Hl7NettyConfig {

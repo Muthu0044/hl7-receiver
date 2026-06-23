@@ -20,6 +20,16 @@ dependencies {
     implementation 'org.apache.camel.quarkus:camel-quarkus-seda'
     implementation 'io.quarkus:quarkus-jackson'
     implementation 'io.quarkus:quarkus-arc'
+    
+    // Observability & Metrics
+    implementation 'io.quarkus:quarkus-micrometer-registry-prometheus'
+    implementation 'org.apache.camel.quarkus:camel-quarkus-micrometer'
+    implementation 'io.quarkus:quarkus-smallrye-health'
+    implementation 'org.apache.camel.quarkus:camel-quarkus-microprofile-health'
+    implementation 'io.quarkus:quarkus-opentelemetry'
+    implementation 'org.apache.camel.quarkus:camel-quarkus-opentelemetry'
+    implementation 'io.quarkus:quarkus-logging-json'
+
     testImplementation 'io.quarkus:quarkus-junit'
 }
 

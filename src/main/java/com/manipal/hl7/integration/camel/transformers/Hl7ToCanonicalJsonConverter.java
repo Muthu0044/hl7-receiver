@@ -1,4 +1,4 @@
-package com.manipal.hl7;
+package com.manipal.hl7.integration.camel.transformers;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

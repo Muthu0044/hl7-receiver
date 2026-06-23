@@ -1,0 +1,108 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hl7-receiver-config
+  labels:
+    app: hl7-receiver
+data:
+  QUARKUS_HTTP_PORT: "8085"
+  QUARKUS_LOG_LEVEL: "INFO"
+  HL7_MLLP_ENABLED: "true"
+  HL7_MLLP_PORT: "2575"
+  KAFKA_BROKERS: "kafka-cluster:9092"
+  KAFKA_TOPIC_DEFAULT: "hl7-messages"
+  KAFKA_TOPIC_SIU: "siu-topic"
+  KAFKA_TOPIC_ADT: "adt-topic"
+  KAFKA_CONCURRENT_CONSUMERS: "5"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hl7-receiver
+  labels:
+    app: hl7-receiver
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hl7-receiver
+  template:
+    metadata:
+      labels:
+        app: hl7-receiver
+    spec:
+      containers:
+      - name: hl7-receiver
+        image: image-registry.openshift-image-registry.svc:5000/my-project/hl7-receiver:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8085
+          name: http
+        - containerPort: 2575
+          name: mllp
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+        securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        envFrom:
+        - configMapRef:
+            name: hl7-receiver-config
+        startupProbe:
+          httpGet:
+            path: /q/health/started
+            port: 8085
+          failureThreshold: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /q/health/live
+            port: 8085
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /q/health/ready
+            port: 8085
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hl7-receiver
+  labels:
+    app: hl7-receiver
+spec:
+  ports:
+  - port: 8085
+    targetPort: 8085
+    name: http
+  - port: 2575
+    targetPort: 2575
+    name: mllp
+  selector:
+    app: hl7-receiver
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: hl7-receiver-http
+  labels:
+    app: hl7-receiver
+spec:
+  port:
+    targetPort: http
+  to:
+    kind: Service
+    name: hl7-receiver
+    weight: 100
+  wildcardPolicy: None

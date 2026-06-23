@@ -1,12 +1,14 @@
-package com.manipal.hl7;
+package com.manipal.hl7.integration.registry;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.manipal.hl7.integration.camel.transformers.Hl7ToCanonicalJsonConverter;
+import com.manipal.hl7.service.processor.Hl7MessageProcessor;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.literal.NamedLiteral;
 import jakarta.inject.Inject;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jboss.logging.Logger;
 
 /**

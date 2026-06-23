@@ -1,5 +1,8 @@
-package com.manipal.hl7;
+package com.manipal.hl7.integration.camel.routes;
 
+import com.manipal.hl7.integration.camel.processors.Hl7TopicResolver;
+import com.manipal.hl7.integration.registry.Hl7ProcessorRegistry;
+import com.manipal.hl7.integration.camel.transformers.Hl7AckGenerator;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.camel.builder.RouteBuilder;
@@ -24,7 +27,10 @@ public class Hl7RouteBuilder extends RouteBuilder {
 
     @Override
     public void configure() throws Exception {
-        // Global error handler to capture issues and log them properly
+        // Enable Mapped Diagnostic Context (MDC) logging in Camel for thread propagation
+        getContext().setUseMDCLogging(true);
+
+        // Global error handler to capture issues and log them properly (returns standard HL7 AE error ACK)
         onException(Exception.class)
             .handled(true)
             .log(org.apache.camel.LoggingLevel.ERROR, "Error occurred in HL7 route: ${exception.stacktrace}")
@@ -78,7 +84,15 @@ public class Hl7RouteBuilder extends RouteBuilder {
             // 3.1. Extract message type and resolve target Kafka topic dynamically
             .process(topicResolver)
             
-            // 3.2. Transform the raw HL7 body into enriched Canonical JSON string
+            // 3.2. Ensure the CorrelationId is populated in MDC on the SEDA consumer thread
+            .process(exchange -> {
+                String correlationId = exchange.getIn().getHeader("CorrelationId", String.class);
+                if (correlationId != null) {
+                    org.slf4j.MDC.put("correlationId", correlationId);
+                }
+            })
+            
+            // 3.3. Transform the raw HL7 body into enriched Canonical JSON string
             .setBody(exchange -> processorRegistry.processAndConvert(
                 exchange.getIn().getBody(String.class),
                 exchange.getProperty("messageType", String.class)
@@ -86,7 +100,7 @@ public class Hl7RouteBuilder extends RouteBuilder {
             
             .log("Publishing Canonical JSON to Kafka...")
             
-            // 3.3. Send payload to Kafka using the dynamically resolved override topic
+            // 3.4. Send payload to Kafka using the dynamically resolved override topic
             .to("kafka:default-topic?brokers={{kafka.brokers}}")
             .log("Successfully published message to Kafka!");
     }
