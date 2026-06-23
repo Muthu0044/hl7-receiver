@@ -1,19 +1,26 @@
 package com.manipal.hl7;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.component.hl7.HL7;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
- * Route builder that configures Apache Camel routes for receiving HL7 messages
- * and forwarding them to a Kafka broker asynchronously.
+ * Route builder that configures Apache Camel routes for receiving HL7 messages,
+ * transforming them to Canonical JSON, and forwarding them to dynamically resolved
+ * Kafka topics asynchronously.
  */
 @ApplicationScoped
 public class Hl7RouteBuilder extends RouteBuilder {
 
     @ConfigProperty(name = "hl7.mllp.enabled", defaultValue = "true")
     boolean mllpEnabled;
+
+    @Inject
+    Hl7TopicResolver topicResolver;
+
+    @Inject
+    Hl7ProcessorRegistry processorRegistry;
 
     @Override
     public void configure() throws Exception {
@@ -63,13 +70,24 @@ public class Hl7RouteBuilder extends RouteBuilder {
         // ==========================================
         // 3. Asynchronous Kafka Publisher
         // ==========================================
-        // seda queue buffers messages and processes them on a separate thread pool.
+        // SEDA queue buffers messages and processes them on a separate thread pool.
         from("seda:publishToKafka?concurrentConsumers={{kafka.concurrent.consumers:5}}")
             .routeId("hl7-kafka-publisher")
             .log("Processing HL7 message for Kafka on thread: ${threadName}")
             
-            // Send the raw message body (as String) to Kafka
-            .to("kafka:{{kafka.topic}}?brokers={{kafka.brokers}}")
-            .log("Successfully published message to Kafka topic: {{kafka.topic}}");
+            // 3.1. Extract message type and resolve target Kafka topic dynamically
+            .process(topicResolver)
+            
+            // 3.2. Transform the raw HL7 body into enriched Canonical JSON string
+            .setBody(exchange -> processorRegistry.processAndConvert(
+                exchange.getIn().getBody(String.class),
+                exchange.getProperty("messageType", String.class)
+            ))
+            
+            .log("Publishing Canonical JSON to Kafka...")
+            
+            // 3.3. Send payload to Kafka using the dynamically resolved override topic
+            .to("kafka:default-topic?brokers={{kafka.brokers}}")
+            .log("Successfully published message to Kafka!");
     }
 }

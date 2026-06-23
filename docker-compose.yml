@@ -22,7 +22,9 @@ services:
       HL7_MLLP_PORT: ${HL7_MLLP_PORT}
       # Inside Docker network, connect to Kafka service using port 9092
       KAFKA_BROKERS: kafka-cluster:9092
-      KAFKA_TOPIC: ${KAFKA_TOPIC}
+      KAFKA_TOPIC_DEFAULT: ${KAFKA_TOPIC_DEFAULT}
+      KAFKA_TOPIC_SIU: ${KAFKA_TOPIC_SIU}
+      KAFKA_TOPIC_ADT: ${KAFKA_TOPIC_ADT}
       KAFKA_CONCURRENT_CONSUMERS: ${KAFKA_CONCURRENT_CONSUMERS}
     depends_on:
       - kafka-cluster
