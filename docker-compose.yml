@@ -1,0 +1,57 @@
+version: "3.9"
+
+networks:
+  kafka-net:
+    driver: bridge
+
+services:
+  hl7-receiver:
+    container_name: hl7-receiver
+    build:
+      context: .
+      dockerfile: src/main/docker/Dockerfile.jvm
+    restart: unless-stopped
+    ports:
+      - "${QUARKUS_HTTP_PORT}:${QUARKUS_HTTP_PORT}"
+      - "${HL7_MLLP_PORT}:${HL7_MLLP_PORT}"
+    environment:
+      QUARKUS_HTTP_PORT: ${QUARKUS_HTTP_PORT}
+      QUARKUS_LOG_LEVEL: ${QUARKUS_LOG_LEVEL}
+      QUARKUS_LOG_CATEGORY__COM_MANIPAL__LEVEL: ${QUARKUS_LOG_CATEGORY__COM_MANIPAL__LEVEL}
+      HL7_MLLP_ENABLED: ${HL7_MLLP_ENABLED}
+      HL7_MLLP_PORT: ${HL7_MLLP_PORT}
+      # Inside Docker network, connect to Kafka service using port 9092
+      KAFKA_BROKERS: kafka-cluster:9092
+      KAFKA_TOPIC: ${KAFKA_TOPIC}
+      KAFKA_CONCURRENT_CONSUMERS: ${KAFKA_CONCURRENT_CONSUMERS}
+    depends_on:
+      - kafka-cluster
+    networks:
+      - kafka-net
+
+  kafka-cluster:
+    image: lensesio/fast-data-dev
+    container_name: kafka-cluster
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+      - "18081:8081"
+      - "8083:8083"
+      - "3030:3030"
+    environment:
+      ADV_HOST: kafka-cluster
+    networks:
+      - kafka-net
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    restart: unless-stopped
+    ports:
+      - "7000:8080"
+    environment:
+      DYNAMIC_CONFIG_ENABLED: "true"
+      KAFKA_CLUSTERS_0_NAME: local-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-cluster:9092
+    networks:
+      - kafka-net
