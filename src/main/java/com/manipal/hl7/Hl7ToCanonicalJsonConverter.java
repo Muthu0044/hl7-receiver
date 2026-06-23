@@ -1,5 +1,6 @@
 package com.manipal.hl7;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -63,21 +64,37 @@ public class Hl7ToCanonicalJsonConverter {
                     }
                     
                     // Extract metadata fields for the JSON root
-                    String messageTypeField = segJson.path("9").asText(""); // e.g. SIU^S12
                     String msgType = "";
                     String triggerEvent = "";
-                    if (messageTypeField.contains("^")) {
-                        String[] parts = messageTypeField.split("\\^");
-                        msgType = parts[0];
-                        triggerEvent = parts.length > 1 ? parts[1] : "";
+                    JsonNode msh9Node = segJson.path("9");
+                    
+                    if (msh9Node.isObject()) {
+                        // If MSH-9 was parsed into components (e.g. SIU^S12)
+                        msgType = msh9Node.path("1").asText("");
+                        triggerEvent = msh9Node.path("2").asText("");
                     } else {
-                        msgType = messageTypeField;
+                        // If MSH-9 is a raw String
+                        String messageTypeField = msh9Node.asText("");
+                        if (messageTypeField.contains("^")) {
+                            String[] parts = messageTypeField.split("\\^");
+                            msgType = parts[0];
+                            triggerEvent = parts.length > 1 ? parts[1] : "";
+                        } else {
+                            msgType = messageTypeField;
+                        }
                     }
 
                     metadataNode.put("messageType", msgType);
                     metadataNode.put("triggerEvent", triggerEvent);
-                    metadataNode.put("messageControlId", segJson.path("10").asText(""));
-                    metadataNode.put("version", segJson.path("12").asText(""));
+                    
+                    // messageControlId (MSH-10) and version (MSH-12) might also contain components (ObjectNode)
+                    JsonNode msh10Node = segJson.path("10");
+                    String msgControlId = msh10Node.isObject() ? msh10Node.path("1").asText("") : msh10Node.asText("");
+                    metadataNode.put("messageControlId", msgControlId);
+                    
+                    JsonNode msh12Node = segJson.path("12");
+                    String versionId = msh12Node.isObject() ? msh12Node.path("1").asText("") : msh12Node.asText("");
+                    metadataNode.put("version", versionId);
 
                 } else {
                     String escapedSep = escapeRegex(fieldSep);
