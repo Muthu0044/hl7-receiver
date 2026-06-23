@@ -17,6 +17,7 @@ dependencies {
     implementation 'org.apache.camel.quarkus:camel-quarkus-hl7'
     implementation 'org.apache.camel.quarkus:camel-quarkus-http'
     implementation 'org.apache.camel.quarkus:camel-quarkus-platform-http'
+    implementation 'org.apache.camel.quarkus:camel-quarkus-seda'
     implementation 'io.quarkus:quarkus-arc'
     testImplementation 'io.quarkus:quarkus-junit'
 }
