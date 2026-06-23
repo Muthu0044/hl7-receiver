@@ -22,8 +22,8 @@ public class Hl7RouteBuilder extends RouteBuilder {
             .handled(true)
             .log(org.apache.camel.LoggingLevel.ERROR, "Error occurred in HL7 route: ${exception.stacktrace}")
             .setHeader("CamelHttpResponseCode", constant(500))
-            .setHeader("Content-Type", constant("application/json"))
-            .setBody(simple("{\"status\":\"ERROR\",\"message\":\"Failed to process HL7 message: ${exception.message}\"}"));
+            .setHeader("Content-Type", constant("text/plain"))
+            .setBody(simple("MSH|^~\\&|HL7_RECEIVER||||${date:now:yyyyMMddHHmmss}||ACK||P|2.3.1\rMSA|AE||Failed to process HL7 message: ${exception.message}\r"));
 
         // ==========================================
         // 1. HTTP REST API Receiver
@@ -36,10 +36,12 @@ public class Hl7RouteBuilder extends RouteBuilder {
             // The client gets the HTTP response immediately without waiting for Kafka publishing.
             .wireTap("seda:publishToKafka")
             
-            // Prepare response for HTTP client
-            .setHeader("CamelHttpResponseCode", constant(202))
-            .setHeader("Content-Type", constant("application/json"))
-            .setBody(constant("{\"status\":\"ACCEPTED\",\"message\":\"HL7 message received and is being processed asynchronously.\"}"));
+            // Transform the body using the manual HL7 ACK generator
+            .transform().body(String.class, Hl7AckGenerator::generateAck)
+            
+            // Prepare response for HTTP client (standard plain text HL7 response)
+            .setHeader("CamelHttpResponseCode", constant(200))
+            .setHeader("Content-Type", constant("text/plain"));
 
         // ==========================================
         // 2. MLLP TCP Server Receiver (Standard HL7)
@@ -54,7 +56,7 @@ public class Hl7RouteBuilder extends RouteBuilder {
                 .wireTap("seda:publishToKafka")
                 
                 // Generate and return HL7 ACK (acknowledgment) immediately
-                .transform(HL7.ack())
+                .transform().body(String.class, Hl7AckGenerator::generateAck)
                 .log("Sent MLLP ACK response to caller");
         }
 
